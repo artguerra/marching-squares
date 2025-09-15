@@ -2,21 +2,22 @@
 
 out vec4 FragColor;
 
-uniform vec2 viewportDimensions;
-
-uniform vec2 center;
-uniform float viewSpan;
-
-const float lineWidth = 0.01;
+uniform int resolution;  // size (px) of each square
+uniform sampler2D concentration;
 
 void main() {
-  vec2 uv = (gl_FragCoord.xy / viewportDimensions.xy) * viewSpan + center;
-  uv.y *= viewportDimensions.y / viewportDimensions.x;
+  ivec2 gridSize = textureSize(concentration, 0);
+  ivec2 cell = ivec2(gl_FragCoord.xy / float(resolution));
+  cell = clamp(cell, ivec2(0), gridSize - ivec2(1));
 
-  vec2 lineAA = fwidth(uv);
-  vec2 gridUV = 1.0 - abs(fract(uv * 10) * 2 - 1.0);
-  vec2 grid2 = smoothstep(lineWidth + lineAA, lineWidth - lineAA, gridUV);
-  float grid = max(grid2.x, grid2.y);
+  float conc = texelFetch(concentration, cell, 0).r;
 
-  FragColor = vec4(vec3(grid) * 0.8, 1.0);
+  // vec3 color = vec3(0.0);
+  // if (square_y % 2 == 0) {
+  //   color = square_x % 2 == 0 ? vec3(0.0) : vec3(1.0);
+  // } else {
+  //   color = square_x % 2 == 0 ? vec3(1.0) : vec3(0.0);
+  // }
+
+  FragColor = vec4(vec3(conc), 1.0);
 }

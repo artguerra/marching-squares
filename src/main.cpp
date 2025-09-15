@@ -97,7 +97,7 @@ int main() {
 
   int w, h;
   glfwGetWindowSize(g_window, &w, &h);
-  g_app = new Application(w, h);
+  g_app = new Application(w, h, 20);
 
   while (!glfwWindowShouldClose(g_window)) {
     glfwSwapBuffers(g_window);
@@ -111,6 +111,7 @@ int main() {
     ImGui::NewFrame();
 
     // render
+    g_app->computeConcentrations();
     g_app->render();
 
     ImGui::Render();
