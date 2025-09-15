@@ -22,15 +22,17 @@ void Application::render() {
   m_mainShader.use();
   m_mainShader.setInt("resolution", m_resolution);
 
+  updateConcentrationTexture();
+
   glBindVertexArray(VAO);
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, m_concentrationTex);
   glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
   glBindVertexArray(0);
 
-  ImGui::Begin("Hello, ImGui!");
-  ImGui::Text("This is a window!");
-  ImGui::End();
+  // ImGui::Begin("Hello, ImGui!");
+  // ImGui::Text("This is a window!");
+  // ImGui::End();
 }
 
 void Application::computeConcentrations(f32 delta_t) {
@@ -60,15 +62,13 @@ void Application::computeConcentrations(f32 delta_t) {
       f32 du = -(u * v * v) + F * (1 - u) + Du * u_lapl;
       f32 dv = (u * v * v) - (F + k) * v + Dv * v_lapl;
 
-      new_u[cur_idx] = std::max(u + du, 0.0f);
-      new_v[cur_idx] = std::max(v + dv, 0.0f);
+      new_u[cur_idx] = std::max(u + du * delta_t, 0.0f);
+      new_v[cur_idx] = std::max(v + dv * delta_t, 0.0f);
     }
   }
 
   u_conc = std::move(new_u);
   v_conc = std::move(new_v);
-
-  updateConcentrationTexture();
 }
 
 void Application::updateConcentrationTexture() {
@@ -101,9 +101,7 @@ void Application::initBuffers() {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-  glTexImage2D(
-      GL_TEXTURE_2D, 0, GL_R32F, m_gridWidth, m_gridHeight, 0, GL_RED, GL_FLOAT, nullptr
-  );
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, m_gridWidth, m_gridHeight, 0, GL_RED, GL_FLOAT, nullptr);
 
   glBindTexture(GL_TEXTURE_2D, 0);
   glBindVertexArray(0);

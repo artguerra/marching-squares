@@ -57,13 +57,12 @@ class Application {
 
     auto idx = [&](int x,int y){ return y*m_gridWidth + x; };
 
-    // seed a small square in the center
     int cx = m_gridWidth  / 2;
     int cy = m_gridHeight / 2;
     for (int y = cy-4; y <= cy+4; ++y)
       for (int x = cx-4; x <= cx+4; ++x) {
-        v_conc[idx(x, y)] = 1.2f;   // 0.2–0.5 works well
-        u_conc[idx(x, y)] = 0.50f;   // optional dip in u speeds things up
+        v_conc[idx(x, y)] = 1.0f;
+        u_conc[idx(x, y)] = 0.50f;
       }
   }
 

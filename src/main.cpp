@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 
 #include "Application.h"
+#include "types.h"
 
 constexpr float ASPECT_RATIO = 16.f / 9;
 constexpr int WINDOW_WIDTH = 1920;
@@ -99,8 +100,8 @@ int main() {
   glfwGetWindowSize(g_window, &w, &h);
   g_app = new Application(w, h, 10);
 
-  f32 past_frame, delta_t;
-  past_frame = glfwGetTime();
+  const f32 sim_dt = 1.0f;
+  i32 steps_per_frame = 8;
 
   while (!glfwWindowShouldClose(g_window)) {
     glfwSwapBuffers(g_window);
@@ -113,12 +114,13 @@ int main() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    f32 current_frame = static_cast<f32>(glfwGetTime());
-    delta_t = current_frame - past_frame;
-    past_frame = current_frame;
+    ImGui::SliderInt("Steps per frame", &steps_per_frame, 1, 24);
+
+    for (i32 step = 0; step < steps_per_frame; ++step) {
+      g_app->computeConcentrations(sim_dt);
+    }
 
     // render
-    g_app->computeConcentrations(delta_t);
     g_app->render();
 
     ImGui::Render();
