@@ -12,12 +12,7 @@ void main() {
 
   float conc = texelFetch(concentration, cell, 0).r;
 
-  // vec3 color = vec3(0.0);
-  // if (square_y % 2 == 0) {
-  //   color = square_x % 2 == 0 ? vec3(0.0) : vec3(1.0);
-  // } else {
-  //   color = square_x % 2 == 0 ? vec3(1.0) : vec3(0.0);
-  // }
+  vec3 color = conc * vec3(0.0, 0.99, 0.98);
 
-  FragColor = vec4(vec3(conc), 1.0);
+  FragColor = vec4(color, 1.0);
 }

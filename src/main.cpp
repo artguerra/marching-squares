@@ -97,7 +97,10 @@ int main() {
 
   int w, h;
   glfwGetWindowSize(g_window, &w, &h);
-  g_app = new Application(w, h, 20);
+  g_app = new Application(w, h, 10);
+
+  f32 past_frame, delta_t;
+  past_frame = glfwGetTime();
 
   while (!glfwWindowShouldClose(g_window)) {
     glfwSwapBuffers(g_window);
@@ -110,8 +113,12 @@ int main() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    f32 current_frame = static_cast<f32>(glfwGetTime());
+    delta_t = current_frame - past_frame;
+    past_frame = current_frame;
+
     // render
-    g_app->computeConcentrations();
+    g_app->computeConcentrations(delta_t);
     g_app->render();
 
     ImGui::Render();

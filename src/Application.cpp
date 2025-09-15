@@ -1,5 +1,6 @@
 #include "Application.h"
 
+#include <algorithm>
 #include <imgui.h>
 
 #include <glad/glad.h>
@@ -32,28 +33,48 @@ void Application::render() {
   ImGui::End();
 }
 
-void Application::computeConcentrations() {
-  u_conc[0] = 1.0f;
+void Application::computeConcentrations(f32 delta_t) {
+  const f32 F = 0.037f;
+  const f32 k = 0.06f;
+  const f32 Du = 0.16f, Dv = 0.08f;
+
+  std::vector<f32> new_u(u_conc.size());
+  std::vector<f32> new_v(v_conc.size());
+
+  i32 w = m_gridWidth, h = m_gridHeight;
+
+  auto idx = [&](i32 x, i32 y) { return y * w + x; };
+
+  for (i32 i = 0; i < w; ++i) {
+    for (i32 j = 0; j < h; ++j) {
+      i32 cur_idx = idx(i, j);
+      f32 u = u_conc[cur_idx];
+      f32 v = v_conc[cur_idx];
+
+      auto U = [&](i32 x, i32 y) { return u_conc[idx((x + w) % w, (y + h) % h)]; };
+      auto V = [&](i32 x, i32 y) { return v_conc[idx((x + w) % w, (y + h) % h)]; };
+
+      f32 u_lapl = U(i - 1, j) + U(i + 1, j) + U(i, j - 1) + U(i, j + 1) - 4 * U(i, j);
+      f32 v_lapl = V(i - 1, j) + V(i + 1, j) + V(i, j - 1) + V(i, j + 1) - 4 * V(i, j);
+
+      f32 du = -(u * v * v) + F * (1 - u) + Du * u_lapl;
+      f32 dv = (u * v * v) - (F + k) * v + Dv * v_lapl;
+
+      new_u[cur_idx] = std::max(u + du, 0.0f);
+      new_v[cur_idx] = std::max(v + dv, 0.0f);
+    }
+  }
+
+  u_conc = std::move(new_u);
+  v_conc = std::move(new_v);
 
   updateConcentrationTexture();
 }
 
 void Application::updateConcentrationTexture() {
-  std::vector<f32> normalized(u_conc.size());
-
-  for (i32 i = 0; i < u_conc.size(); ++i) {
-    f32 u = u_conc[i];
-    f32 v = v_conc[i];
-
-    if (u == 0 && v == 0)
-      normalized[i] = 0;
-    else
-      normalized[i] = (u - v) / (u + v);
-  }
-
   glBindTexture(GL_TEXTURE_2D, m_concentrationTex);
   glTexSubImage2D(
-      GL_TEXTURE_2D, 0, 0, 0, m_gridWidth, m_gridHeight, GL_RED, GL_FLOAT, normalized.data()
+      GL_TEXTURE_2D, 0, 0, 0, m_gridWidth, m_gridHeight, GL_RED, GL_FLOAT, v_conc.data()
   );
 }
 
@@ -81,7 +102,7 @@ void Application::initBuffers() {
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
   glTexImage2D(
-      GL_TEXTURE_2D, 0, GL_R32F, m_windowWidth, m_windowHeight, 0, GL_RED, GL_FLOAT, nullptr
+      GL_TEXTURE_2D, 0, GL_R32F, m_gridWidth, m_gridHeight, 0, GL_RED, GL_FLOAT, nullptr
   );
 
   glBindTexture(GL_TEXTURE_2D, 0);

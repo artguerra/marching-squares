@@ -29,7 +29,7 @@ class Application {
     resetConcentrations();
   }
 
-  void computeConcentrations();
+  void computeConcentrations(f32 delta_t);
 
   void render();
 
@@ -49,11 +49,22 @@ class Application {
   void updateConcentrationTexture();
 
   void resetConcentrations() {
-    m_gridWidth = m_windowWidth / m_resolution;
+    m_gridWidth  = m_windowWidth  / m_resolution;
     m_gridHeight = m_windowHeight / m_resolution;
 
-    u_conc.resize(m_gridWidth * m_gridHeight);
-    v_conc.resize(m_gridWidth * m_gridHeight);
+    u_conc.assign(m_gridWidth * m_gridHeight, 1.0f);
+    v_conc.assign(m_gridWidth * m_gridHeight, 0.0f);
+
+    auto idx = [&](int x,int y){ return y*m_gridWidth + x; };
+
+    // seed a small square in the center
+    int cx = m_gridWidth  / 2;
+    int cy = m_gridHeight / 2;
+    for (int y = cy-4; y <= cy+4; ++y)
+      for (int x = cx-4; x <= cx+4; ++x) {
+        v_conc[idx(x, y)] = 1.2f;   // 0.2–0.5 works well
+        u_conc[idx(x, y)] = 0.50f;   // optional dip in u speeds things up
+      }
   }
 
   static constexpr char VERTEX_SHADER_PATH[] = "shaders/grid.vert";

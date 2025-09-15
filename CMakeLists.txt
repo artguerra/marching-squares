@@ -33,13 +33,13 @@ set(SOURCES
     ${MAIN_SOURCE}
 )
 
-add_executable(marching_squares ${SOURCES})
+add_executable(${PROJECT_NAME} ${SOURCES})
 
-target_sources(marching_squares PRIVATE ${IMGUI_SOURCES})
+target_sources(${PROJECT_NAME} PRIVATE ${IMGUI_SOURCES})
 
-target_link_libraries(marching_squares glfw glm::glm glad)
+target_link_libraries(${PROJECT_NAME} glfw glm::glm glad)
 
-target_include_directories(marching_squares PUBLIC
+target_include_directories(${PROJECT_NAME} PUBLIC
   "${PROJECT_SOURCE_DIR}/include"
   "${IMGUI_DIR}"
   "${IMGUI_DIR}/backends"
