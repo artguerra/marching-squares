@@ -32,6 +32,12 @@ void Application::render() {
   ImGui::End();
 }
 
+void Application::computeConcentrations() {
+  u_conc[0] = 1.0f;
+
+  updateConcentrationTexture();
+}
+
 void Application::updateConcentrationTexture() {
   std::vector<f32> normalized(u_conc.size());
 
