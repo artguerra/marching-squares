@@ -11,6 +11,9 @@
 #include "Application.h"
 #include "types.h"
 
+#include "Profiler.h"
+#include "ProfilerUI.h"
+
 constexpr f32 ASPECT_RATIO = 16.f / 9;
 constexpr i32 WINDOW_WIDTH = 1920;
 constexpr i32 WINDOW_HEIGHT = WINDOW_WIDTH / ASPECT_RATIO;
@@ -22,6 +25,8 @@ Application* g_app;
 // global state variables
 bool g_wireframeActive = false;
 bool g_draggingMouse = false;
+bool g_drawUI = true;
+bool g_drawProfiler = false;
 
 void windowSizeCallback(GLFWwindow* window, i32 width, i32 height) {
   glViewport(0, 0, width, height);
@@ -37,6 +42,12 @@ void keyCallback(GLFWwindow* window, i32 key, i32 scancode, i32 action, i32 mods
       glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     g_wireframeActive = !g_wireframeActive;
+  } else if (action == GLFW_PRESS && key == GLFW_KEY_P) {
+    g_drawProfiler = !g_drawProfiler;
+  } else if (action == GLFW_PRESS && key == GLFW_KEY_G) {
+    g_drawUI = !g_drawUI;
+  } else if (action == GLFW_PRESS && key == GLFW_KEY_R) {
+    if (g_app) g_app->resetConcentrations();
   } else if (action == GLFW_PRESS && (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q)) {
     glfwSetWindowShouldClose(window, true);
   }
@@ -114,13 +125,16 @@ int main() {
   initOpenGL();
   initImgui();
 
+  Profiler profiler;
+
   i32 w, h;
   glfwGetWindowSize(g_window, &w, &h);
-  g_app = new Application(w, h, 10);
+  g_app = new Application(w, h, 10, profiler);
 
   const f32 sim_dt = 1.0f;
 
   while (!glfwWindowShouldClose(g_window)) {
+    profiler.beginFrame();
     glfwSwapBuffers(g_window);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -131,12 +145,19 @@ int main() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    for (i32 step = 0; step < g_app->getStepsPerFrame(); ++step) {
-      g_app->computeConcentrations(sim_dt);
+    {
+      Profiler::Scope _s(profiler, "Simulation");
+      for (i32 step = 0; step < g_app->getStepsPerFrame(); ++step) {
+        g_app->computeConcentrations(sim_dt);
+      }
     }
 
     // render
-    g_app->render();
+    g_app->render(g_drawUI);
+
+    // profiling
+    profiler.endFrame();
+    if (g_drawProfiler) (DrawProfilerImGui(profiler));
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

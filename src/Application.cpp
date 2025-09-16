@@ -6,6 +6,7 @@
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 
+#include "Profiler.h"
 #include "types.h"
 
 constexpr f32 VERTICES[] = {
@@ -16,15 +17,21 @@ constexpr u32 INDICES[] = {
     0, 1, 3, 1, 2, 3,
 };
 
-void Application::render() {
+void Application::render(bool drawUI) {
   if (!m_buffersInitializated) initBuffers();
 
-  renderUI();
+  {
+    Profiler::Scope _s (m_prof, "GUI");
+    if (drawUI) renderUI();
+  }
 
   m_mainShader.use();
   m_mainShader.setInt("resolution", m_resolution);
 
-  updateConcentrationTexture();
+  {
+    Profiler::Scope _s(m_prof, "Texture upload");
+    updateConcentrationTexture();
+  }
 
   glBindVertexArray(VAO);
   glActiveTexture(GL_TEXTURE0);
@@ -35,6 +42,8 @@ void Application::render() {
 
 void Application::renderUI() {
   ImGui::Begin("Simulation controls");
+  ImGui::Text("Press 'P' to show/hide the profiler");
+  ImGui::Text("Press 'G' to show/hide this UI");
   
   ImGui::SliderInt("N. of steps per frame", &m_stepsPerFrame, 1, 24);
 
@@ -59,7 +68,7 @@ void Application::renderUI() {
 
   ImGui::SliderFloat("k (\"kill rate\")", &k, 0.04f, 0.07f);
 
-  if (ImGui::Button("Reset simulation")) resetConcentrations();
+  if (ImGui::Button("Reset simulation (R)")) resetConcentrations();
   if (ImGui::Button("Reset simulation w/ center filled preset"))
     presetFillCenter();
 

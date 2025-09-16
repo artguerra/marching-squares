@@ -3,6 +3,7 @@
 
 #include <vector>
 
+#include "Profiler.h"
 #include "Shader.h"
 #include "types.h"
 
@@ -13,6 +14,9 @@ struct Preset {
 
 class Application {
  private:
+  // profiling
+  Profiler& m_prof;
+
   // opengl variables
   u32 VAO, VBO, EBO;
   u32 m_concentrationTex;
@@ -32,12 +36,14 @@ class Application {
   std::vector<f32> u_conc;
   std::vector<f32> v_conc;
 
+  // shaders
   bool m_buffersInitializated{false};
   Shader m_mainShader;
 
  public:
-  Application(i32 width, i32 height, i32 res)
-      : m_windowWidth{width},
+  Application(i32 width, i32 height, i32 res, Profiler& _profiler)
+      : m_prof(_profiler),
+        m_windowWidth{width},
         m_windowHeight{height},
         m_resolution{res},
         m_mainShader(VERTEX_SHADER_PATH, FRAGMENT_SHADER_PATH) {
@@ -45,9 +51,19 @@ class Application {
   }
 
   void computeConcentrations(f32 delta_t);
-  void render();
+  void render(bool drawUI);
 
   void handleMouseAction(f64 xpos, f64 ypos);
+
+  void resetConcentrations() {
+    m_prof.restart();
+
+    m_gridWidth = m_windowWidth / m_resolution;
+    m_gridHeight = m_windowHeight / m_resolution;
+
+    u_conc.assign(m_gridWidth * m_gridHeight, 1.0f);
+    v_conc.assign(m_gridWidth * m_gridHeight, 0.0f);
+  }
 
   void setWindowSize(i32 w, i32 h) {
     m_windowWidth = w;
@@ -72,14 +88,6 @@ class Application {
   void updateConcentrationTexture();
 
   void renderUI();
-
-  void resetConcentrations() {
-    m_gridWidth = m_windowWidth / m_resolution;
-    m_gridHeight = m_windowHeight / m_resolution;
-
-    u_conc.assign(m_gridWidth * m_gridHeight, 1.0f);
-    v_conc.assign(m_gridWidth * m_gridHeight, 0.0f);
-  }
 
   void presetFillCenter() {
     resetConcentrations();
