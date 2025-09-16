@@ -12,7 +12,14 @@ void main() {
 
   float conc = texelFetch(concentration, cell, 0).r;
 
-  vec3 color = conc * vec3(0.0, 0.99, 0.98);
+  float t = smoothstep(0.02, 0.6, conc);
+  float glow = pow(t, 0.75);
+
+  vec3 c1 = vec3(0.00, 0.90, 1.00);
+  vec3 c2 = vec3(1.00, 0.20, 0.90);
+  vec3 albedo = mix(c1, c2, t);
+
+  vec3 color = vec3(clamp(albedo * glow, 0.0, 1.0));
 
   FragColor = vec4(color, 1.0);
 }

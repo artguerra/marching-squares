@@ -11,9 +11,9 @@
 #include "Application.h"
 #include "types.h"
 
-constexpr float ASPECT_RATIO = 16.f / 9;
-constexpr int WINDOW_WIDTH = 1920;
-constexpr int WINDOW_HEIGHT = WINDOW_WIDTH / ASPECT_RATIO;
+constexpr f32 ASPECT_RATIO = 16.f / 9;
+constexpr i32 WINDOW_WIDTH = 1920;
+constexpr i32 WINDOW_HEIGHT = WINDOW_WIDTH / ASPECT_RATIO;
 
 // global contexts
 GLFWwindow* g_window;
@@ -21,14 +21,15 @@ Application* g_app;
 
 // global state variables
 bool g_wireframeActive = false;
+bool g_draggingMouse = false;
 
-void windowSizeCallback(GLFWwindow* window, int width, int height) {
+void windowSizeCallback(GLFWwindow* window, i32 width, i32 height) {
   glViewport(0, 0, width, height);
 
   if (g_app) g_app->setWindowSize(width, height);
 }
 
-void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+void keyCallback(GLFWwindow* window, i32 key, i32 scancode, i32 action, i32 mods) {
   if (action == GLFW_PRESS && key == GLFW_KEY_X) {
     if (g_wireframeActive)
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -39,6 +40,17 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
   } else if (action == GLFW_PRESS && (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q)) {
     glfwSetWindowShouldClose(window, true);
   }
+}
+
+void mouse_button_callback(GLFWwindow* window, i32 button, i32 action, i32 mods) {
+  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+    g_draggingMouse = true;
+  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
+    g_draggingMouse = false;
+}
+
+void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
+  if (g_draggingMouse) g_app->handleMouseAction(xpos, ypos);
 }
 
 void initGLFW() {
@@ -52,7 +64,7 @@ void initGLFW() {
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
   g_window =
-      glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Interactive Depixelization", nullptr, nullptr);
+      glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Gray-Scott Reaction-Diffusion", nullptr, nullptr);
   if (!g_window) {
     std::cerr << "Failed to create GLFW window" << '\n';
 
@@ -63,6 +75,8 @@ void initGLFW() {
   glfwMakeContextCurrent(g_window);
   glfwSetFramebufferSizeCallback(g_window, windowSizeCallback);
   glfwSetKeyCallback(g_window, keyCallback);
+  glfwSetMouseButtonCallback(g_window, mouse_button_callback);
+  glfwSetCursorPosCallback(g_window, cursor_position_callback);
 }
 
 void initOpenGL() {
@@ -82,9 +96,13 @@ void initImgui() {
   ImGuiIO& io = ImGui::GetIO();
   (void)io;
 
-  // default font size is 18
-  io.Fonts->AddFontFromFileTTF("external/imgui/misc/fonts/Karla-Regular.ttf", 36.0f);
-  ImGui::GetStyle().ScaleAllSizes(2.0f);
+  f32 xscale, yscale, scale;
+  glfwGetMonitorContentScale(glfwGetPrimaryMonitor(), &xscale, &yscale);
+  
+  scale = std::min(xscale, yscale);
+
+  io.Fonts->AddFontFromFileTTF("external/imgui/misc/fonts/Karla-Regular.ttf", 18.0f * scale);
+  ImGui::GetStyle().ScaleAllSizes(scale);
 
   ImGui::StyleColorsDark();
   ImGui_ImplGlfw_InitForOpenGL(g_window, true);
@@ -96,12 +114,11 @@ int main() {
   initOpenGL();
   initImgui();
 
-  int w, h;
+  i32 w, h;
   glfwGetWindowSize(g_window, &w, &h);
   g_app = new Application(w, h, 10);
 
   const f32 sim_dt = 1.0f;
-  i32 steps_per_frame = 8;
 
   while (!glfwWindowShouldClose(g_window)) {
     glfwSwapBuffers(g_window);
@@ -114,9 +131,7 @@ int main() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::SliderInt("Steps per frame", &steps_per_frame, 1, 24);
-
-    for (i32 step = 0; step < steps_per_frame; ++step) {
+    for (i32 step = 0; step < g_app->getStepsPerFrame(); ++step) {
       g_app->computeConcentrations(sim_dt);
     }
 

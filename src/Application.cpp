@@ -19,6 +19,8 @@ constexpr u32 INDICES[] = {
 void Application::render() {
   if (!m_buffersInitializated) initBuffers();
 
+  renderUI();
+
   m_mainShader.use();
   m_mainShader.setInt("resolution", m_resolution);
 
@@ -29,15 +31,42 @@ void Application::render() {
   glBindTexture(GL_TEXTURE_2D, m_concentrationTex);
   glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
   glBindVertexArray(0);
+}
 
-  // ImGui::Begin("Hello, ImGui!");
-  // ImGui::Text("This is a window!");
-  // ImGui::End();
+void Application::renderUI() {
+  ImGui::Begin("Simulation controls");
+  
+  ImGui::SliderInt("N. of steps per frame", &m_stepsPerFrame, 1, 24);
+
+  ImGui::Dummy(ImVec2(0.0f, 20.0f));
+
+  if (ImGui::BeginCombo("Interesting presets", nullptr, ImGuiComboFlags_NoPreview)) {
+    for (i32 i = 0; i < IM_ARRAYSIZE(PRESETS); ++i) {
+      bool selected = m_currentPreset == i;
+
+      if (ImGui::Selectable(PRESETS[i].name.c_str(), selected)) {
+        m_currentPreset = i;
+        setParams(PRESETS[i].F , PRESETS[i].k);
+      }
+
+      if (selected) ImGui::SetItemDefaultFocus();
+    }
+
+    ImGui::EndCombo();
+  }
+
+  ImGui::SliderFloat("F (\"feed rate\")", &F, 0.01f, 0.09f);
+
+  ImGui::SliderFloat("k (\"kill rate\")", &k, 0.04f, 0.07f);
+
+  if (ImGui::Button("Reset simulation")) resetConcentrations();
+  if (ImGui::Button("Reset simulation w/ center filled preset"))
+    presetFillCenter();
+
+  ImGui::End();
 }
 
 void Application::computeConcentrations(f32 delta_t) {
-  const f32 F = 0.037f;
-  const f32 k = 0.06f;
   const f32 Du = 0.16f, Dv = 0.08f;
 
   std::vector<f32> new_u(u_conc.size());
@@ -69,6 +98,19 @@ void Application::computeConcentrations(f32 delta_t) {
 
   u_conc = std::move(new_u);
   v_conc = std::move(new_v);
+}
+
+void Application::handleMouseAction(f64 xpos, f64 ypos) {
+  // dont do anything if imgui is using the mouse
+  if (ImGui::GetIO().WantCaptureMouse)
+    return;
+
+  i32 x = xpos / m_resolution;
+  i32 y = (m_windowHeight - ypos) / m_resolution;
+
+  if (x > 0 && x <= m_gridWidth && y > 0 && y <= m_gridHeight) {
+    v_conc[y * m_gridWidth + x] = 1.0f;
+  }
 }
 
 void Application::updateConcentrationTexture() {
