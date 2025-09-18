@@ -22,4 +22,5 @@ void main() {
   vec3 color = vec3(clamp(albedo * glow, 0.0, 1.0));
 
   FragColor = vec4(color, 1.0);
+  // FragColor = vec4(vec3(conc), 1.0);
 }

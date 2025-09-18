@@ -18,13 +18,24 @@ constexpr u32 INDICES[] = {
 };
 
 void Application::render(bool drawUI) {
-  if (!m_buffersInitializated) initBuffers();
-
   {
-    Profiler::Scope _s (m_prof, "GUI");
+    Profiler::Scope _s(m_prof, "GUI");
     if (drawUI) renderUI();
   }
 
+  if (!m_defaultBuffersInitializated) initDefaultBuffers();
+
+  if (m_isRunningOnGPU) {
+    if (!m_gpuCompTexturesInitialized) initBuffersGPUComp();
+    renderGPUComp();
+  } else {
+    if (!m_cpuCompTexturesInitialized) initBuffersCPUComp();
+    renderCPUComp();
+  }
+}
+
+// pure CPU computation render call
+void Application::renderCPUComp() {
   m_mainShader.use();
   m_mainShader.setInt("resolution", m_resolution);
 
@@ -40,11 +51,59 @@ void Application::render(bool drawUI) {
   glBindVertexArray(0);
 }
 
+void Application::renderGPUComp() {
+  for (i32 i = 0; i < m_stepsPerFrame; ++i) {
+    glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_destTex, 0);
+
+    glViewport(0, 0, m_gridWidth, m_gridHeight);
+
+    m_gpuComputeShader.use();
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_srcTex);
+
+    m_gpuComputeShader.setFloat("F", F);
+    m_gpuComputeShader.setFloat("k", k);
+    m_gpuComputeShader.setFloat("Du", Du);
+    m_gpuComputeShader.setFloat("Dv", Dv);
+    m_gpuComputeShader.setBool("isDraggingMouse", false);
+    m_gpuComputeShader.setVec2("mousePos", m_mousePosX, m_mousePosY);
+
+    if (m_isDraggingMouse && !ImGui::GetIO().WantCaptureMouse) {
+      m_gpuComputeShader.setBool("isDraggingMouse", true);
+    }
+
+    glBindVertexArray(VAO);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+    std::swap(m_srcTex, m_destTex);
+  }
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glViewport(0, 0, m_windowWidth, m_windowHeight);
+
+  m_mainShader.use();
+  m_mainShader.setInt("resolution", m_resolution);
+
+  glBindTexture(GL_TEXTURE_2D, m_srcTex);
+  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+  glBindVertexArray(VAO);
+  glActiveTexture(GL_TEXTURE0);
+
+  glBindVertexArray(0);
+}
+
 void Application::renderUI() {
   ImGui::Begin("Simulation controls");
   ImGui::Text("Press 'P' to show/hide the profiler");
-  ImGui::Text("Press 'G' to show/hide this UI");
-  
+  ImGui::Text("Press 'I' to show/hide this UI");
+  ImGui::Text(
+      "Press 'G' to toggle GPU computation. Currently processing on: %s",
+      m_isRunningOnGPU ? "GPU" : "CPU"
+  );
+
   ImGui::SliderInt("N. of steps per frame", &m_stepsPerFrame, 1, 24);
 
   ImGui::Dummy(ImVec2(0.0f, 20.0f));
@@ -55,7 +114,7 @@ void Application::renderUI() {
 
       if (ImGui::Selectable(PRESETS[i].name.c_str(), selected)) {
         m_currentPreset = i;
-        setParams(PRESETS[i].F , PRESETS[i].k);
+        setParams(PRESETS[i].F, PRESETS[i].k);
       }
 
       if (selected) ImGui::SetItemDefaultFocus();
@@ -69,15 +128,11 @@ void Application::renderUI() {
   ImGui::SliderFloat("k (\"kill rate\")", &k, 0.04f, 0.07f);
 
   if (ImGui::Button("Reset simulation (R)")) resetConcentrations();
-  if (ImGui::Button("Reset simulation w/ center filled preset"))
-    presetFillCenter();
 
   ImGui::End();
 }
 
-void Application::computeConcentrations(f32 delta_t) {
-  const f32 Du = 0.16f, Dv = 0.08f;
-
+void Application::computeConcentrationsCPU(f32 delta_t) {
   std::vector<f32> new_u(u_conc.size());
   std::vector<f32> new_v(v_conc.size());
 
@@ -109,16 +164,15 @@ void Application::computeConcentrations(f32 delta_t) {
   v_conc = std::move(new_v);
 }
 
-void Application::handleMouseAction(f64 xpos, f64 ypos) {
+void Application::handleMouseAction() {
   // dont do anything if imgui is using the mouse
-  if (ImGui::GetIO().WantCaptureMouse)
-    return;
+  if (ImGui::GetIO().WantCaptureMouse) return;
 
-  i32 x = xpos / m_resolution;
-  i32 y = (m_windowHeight - ypos) / m_resolution;
+  if (m_isRunningOnGPU) return;  // on gpu we handle clicks in the shader
 
-  if (x > 0 && x <= m_gridWidth && y > 0 && y <= m_gridHeight) {
-    v_conc[y * m_gridWidth + x] = 1.0f;
+  if (m_mousePosX > 0 && m_mousePosX <= m_gridWidth && m_mousePosY > 0 &&
+      m_mousePosY <= m_gridHeight) {
+    v_conc[m_mousePosY * m_gridWidth + m_mousePosX] = 1.0f;
   }
 }
 
@@ -129,7 +183,7 @@ void Application::updateConcentrationTexture() {
   );
 }
 
-void Application::initBuffers() {
+void Application::initDefaultBuffers() {
   glGenVertexArrays(1, &VAO);
   glBindVertexArray(VAO);
 
@@ -144,6 +198,12 @@ void Application::initBuffers() {
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
   glEnableVertexAttribArray(0);
 
+  glBindVertexArray(0);
+
+  m_defaultBuffersInitializated = true;
+}
+
+void Application::initBuffersCPUComp() {
   // concentration texture
   glGenTextures(1, &m_concentrationTex);
   glBindTexture(GL_TEXTURE_2D, m_concentrationTex);
@@ -155,8 +215,47 @@ void Application::initBuffers() {
   glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, m_gridWidth, m_gridHeight, 0, GL_RED, GL_FLOAT, nullptr);
 
   glBindTexture(GL_TEXTURE_2D, 0);
-  glBindVertexArray(0);
 
-  m_buffersInitializated = true;
+  m_cpuCompTexturesInitialized = true;
+}
+
+void Application::initBuffersGPUComp() {
+  // create framebuffer
+  glGenFramebuffers(1, &FBO);
+  glBindFramebuffer(GL_FRAMEBUFFER, FBO);
+
+  // src texture
+  glGenTextures(1, &m_srcTex);
+  glBindTexture(GL_TEXTURE_2D, m_srcTex);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+  std::vector<float> data(m_gridWidth * m_gridHeight * 2);
+  for (int i = 0; i < m_gridWidth * m_gridHeight; ++i) {
+    data[2 * i] = 0.0f;      // initialize u with 1s
+    data[2 * i + 1] = 1.0f;  // initialize v with 0s
+  }
+
+  glTexImage2D(
+      GL_TEXTURE_2D, 0, GL_RG32F, m_gridWidth, m_gridHeight, 0, GL_RG, GL_FLOAT, data.data()
+  );
+
+  // dest texture
+  glGenTextures(1, &m_destTex);
+  glBindTexture(GL_TEXTURE_2D, m_destTex);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, m_gridWidth, m_gridHeight, 0, GL_RG, GL_FLOAT, nullptr);
+
+  // setup framebuffer
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_destTex, 0);
+
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  m_gpuCompTexturesInitialized = true;
 }
 

@@ -44,10 +44,12 @@ void keyCallback(GLFWwindow* window, i32 key, i32 scancode, i32 action, i32 mods
     g_wireframeActive = !g_wireframeActive;
   } else if (action == GLFW_PRESS && key == GLFW_KEY_P) {
     g_drawProfiler = !g_drawProfiler;
-  } else if (action == GLFW_PRESS && key == GLFW_KEY_G) {
+  } else if (action == GLFW_PRESS && key == GLFW_KEY_I) {
     g_drawUI = !g_drawUI;
   } else if (action == GLFW_PRESS && key == GLFW_KEY_R) {
     if (g_app) g_app->resetConcentrations();
+  } else if (action == GLFW_PRESS && key == GLFW_KEY_G) {
+    if (g_app) g_app->toggleGPUComputation();
   } else if (action == GLFW_PRESS && (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q)) {
     glfwSetWindowShouldClose(window, true);
   }
@@ -55,13 +57,16 @@ void keyCallback(GLFWwindow* window, i32 key, i32 scancode, i32 action, i32 mods
 
 void mouse_button_callback(GLFWwindow* window, i32 button, i32 action, i32 mods) {
   if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
-    g_draggingMouse = true;
+    if (g_app) g_app->setDraggingMouse(true);
   if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
-    g_draggingMouse = false;
+    if (g_app) g_app->setDraggingMouse(false);
 }
 
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
-  if (g_draggingMouse) g_app->handleMouseAction(xpos, ypos);
+  g_app->setMousePos(xpos, ypos);
+  if (g_app->isDraggingMouse()) {
+    g_app->handleMouseAction();
+  }
 }
 
 void initGLFW() {
@@ -145,10 +150,10 @@ int main() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    {
+    if (!g_app->isRunningOnGPU()) {
       Profiler::Scope _s(profiler, "Simulation");
       for (i32 step = 0; step < g_app->getStepsPerFrame(); ++step) {
-        g_app->computeConcentrations(sim_dt);
+        g_app->computeConcentrationsCPU(sim_dt);
       }
     }
 
