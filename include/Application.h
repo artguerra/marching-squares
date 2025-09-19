@@ -33,7 +33,8 @@ class Application {
   const f32 Du = 0.16f, Dv = 0.08f;
 
   // ui controls
-  bool m_isRunningOnGPU{false};
+  float m_brushRadius;
+  bool m_isRunningOnGPU{true};
   i32 m_currentPreset;
 
   bool m_isDraggingMouse{false};
@@ -56,8 +57,10 @@ class Application {
         m_windowWidth{width},
         m_windowHeight{height},
         m_resolution{res},
+        m_brushRadius{std::min(1.0f, 10.0f / res)},
         m_mainShader(VERTEX_SHADER_PATH, FRAGMENT_SHADER_PATH),
         m_gpuComputeShader(VERTEX_SHADER_PATH, SIM_SHADER_PATH) {
+    recalculateGrid();
     resetConcentrations();
   }
 
@@ -68,9 +71,6 @@ class Application {
     m_prof.restart();
 
     // CPU computation
-    m_gridWidth = m_windowWidth / m_resolution;
-    m_gridHeight = m_windowHeight / m_resolution;
-
     u_conc.assign(m_gridWidth * m_gridHeight, 1.0f);
     v_conc.assign(m_gridWidth * m_gridHeight, 0.0f);
 
@@ -89,14 +89,24 @@ class Application {
     }
   }
 
+  void recalculateGrid() {
+    m_gridWidth = m_windowWidth / m_resolution;
+    m_gridHeight = m_windowHeight / m_resolution;
+  }
+
   void setWindowSize(i32 w, i32 h) {
     m_windowWidth = w;
     m_windowHeight = h;
+    recalculateGrid();
     resetConcentrations();
   }
 
   void setResolution(i32 res) {
     m_resolution = res;
+    recalculateGrid();
+
+    initBuffersCPUComp();
+    initBuffersGPUComp();
     resetConcentrations();
   }
 

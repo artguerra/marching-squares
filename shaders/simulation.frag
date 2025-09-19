@@ -7,16 +7,15 @@ uniform float F, k, Du, Dv;
 
 uniform bool isDraggingMouse;
 uniform vec2 mousePos;
-
-const float brushRadius = 1.0;
+uniform float brushRadius;
 
 ivec2 wrap(ivec2 p, ivec2 sz) {
-  return ivec2((p.x % sz.x + sz.x) % sz.x, (p.y % sz.y + sz.y) % sz.y);
+  return ivec2((p.x + sz.x) % sz.x, (p.y + sz.y) % sz.y);
 }
 
-float U(ivec2 p) { return texelFetch(concentrationTex, p, 0).g; }
-
 float V(ivec2 p) { return texelFetch(concentrationTex, p, 0).r; }
+
+float U(ivec2 p) { return texelFetch(concentrationTex, p, 0).g; }
 
 void main() {
   ivec2 p = ivec2(gl_FragCoord.xy);

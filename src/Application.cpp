@@ -4,6 +4,7 @@
 #include <imgui.h>
 
 #include <glad/glad.h>
+#include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 
 #include "Profiler.h"
@@ -67,6 +68,7 @@ void Application::renderGPUComp() {
     m_gpuComputeShader.setFloat("k", k);
     m_gpuComputeShader.setFloat("Du", Du);
     m_gpuComputeShader.setFloat("Dv", Dv);
+    m_gpuComputeShader.setFloat("brushRadius", m_brushRadius);
     m_gpuComputeShader.setBool("isDraggingMouse", false);
     m_gpuComputeShader.setVec2("mousePos", m_mousePosX, m_mousePosY);
 
@@ -95,8 +97,24 @@ void Application::renderGPUComp() {
   glBindVertexArray(0);
 }
 
+static void HelpMarker(const char* desc) {
+  ImGui::TextDisabled("(?)");
+  if (ImGui::IsItemHovered()) {
+    ImGui::BeginTooltip();
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+    ImGui::TextUnformatted(desc);
+    ImGui::PopTextWrapPos();
+    ImGui::EndTooltip();
+  }
+}
+
 void Application::renderUI() {
-  ImGui::Begin("Simulation controls");
+ImGui::SetNextWindowBgAlpha(0.75f);
+ImGui::Begin("Simulation");
+// ...
+ImGui::End();
+  ImGui::Begin("Simulation");
+
   ImGui::Text("Press 'P' to show/hide the profiler");
   ImGui::Text("Press 'I' to show/hide this UI");
   ImGui::Text(
@@ -104,30 +122,50 @@ void Application::renderUI() {
       m_isRunningOnGPU ? "GPU" : "CPU"
   );
 
-  ImGui::SliderInt("N. of steps per frame", &m_stepsPerFrame, 1, 24);
+  // --------- performance / advanced ----------
+  ImGui::SetNextItemOpen(false, ImGuiCond_Once);
+  if (ImGui::CollapsingHeader("Performance / Advanced")) {
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.85f, 0.2f, 1.0f));
+    ImGui::TextWrapped("Caution! Changing these settings may be very resource expensive.");
+    ImGui::PopStyleColor();
 
-  ImGui::Dummy(ImVec2(0.0f, 20.0f));
-
-  if (ImGui::BeginCombo("Interesting presets", nullptr, ImGuiComboFlags_NoPreview)) {
-    for (i32 i = 0; i < IM_ARRAYSIZE(PRESETS); ++i) {
-      bool selected = m_currentPreset == i;
-
-      if (ImGui::Selectable(PRESETS[i].name.c_str(), selected)) {
-        m_currentPreset = i;
-        setParams(PRESETS[i].F, PRESETS[i].k);
-      }
-
-      if (selected) ImGui::SetItemDefaultFocus();
+    if (ImGui::SliderInt("Grid cell size (px)", &m_resolution, 1, 20)) {
+      setResolution(m_resolution);  // realloc grid & textures
     }
+    ImGui::SameLine();
+    HelpMarker("Less = higher resolution (more computationally expensive)");
 
-    ImGui::EndCombo();
+    ImGui::SliderInt("Steps per frame", &m_stepsPerFrame, 1, 32);
+    ImGui::SameLine();
+    HelpMarker("More steps = more simulation updates per frame.");
+
+    // mirror for G key
+    ImGui::Checkbox("Run on GPU", &m_isRunningOnGPU);
   }
 
-  ImGui::SliderFloat("F (\"feed rate\")", &F, 0.01f, 0.09f);
+  // --------- simulation controls ----------
+  ImGui::SetNextItemOpen(true, ImGuiCond_Once);
+  if (ImGui::CollapsingHeader("Simulation Controls", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::BeginCombo("Interesting presets", nullptr, ImGuiComboFlags_NoPreview)) {
+      for (i32 i = 0; i < IM_ARRAYSIZE(PRESETS); ++i) {
+        bool selected = (m_currentPreset == i);
+        if (ImGui::Selectable(PRESETS[i].name.c_str(), selected)) {
+          m_currentPreset = i;
+          setParams(PRESETS[i].F, PRESETS[i].k);
+        }
+        if (selected) ImGui::SetItemDefaultFocus();
+      }
+      ImGui::EndCombo();
+    }
 
-  ImGui::SliderFloat("k (\"kill rate\")", &k, 0.04f, 0.07f);
+    ImGui::SliderFloat("F (feed rate)", &F, 0.01f, 0.09f);
+    ImGui::SliderFloat("k (kill rate)", &k, 0.04f, 0.07f);
 
-  if (ImGui::Button("Reset simulation (R)")) resetConcentrations();
+    float maxRadius = std::max((float)m_resolution, 20.0f / std::max(1.0f, (float)m_resolution));
+    ImGui::SliderFloat("Brush radius", &m_brushRadius, 1.0f, maxRadius);
+
+    if (ImGui::Button("Reset simulation (R)")) resetConcentrations();
+  }
 
   ImGui::End();
 }
@@ -145,6 +183,14 @@ void Application::computeConcentrationsCPU(f32 delta_t) {
       i32 cur_idx = idx(i, j);
       f32 u = u_conc[cur_idx];
       f32 v = v_conc[cur_idx];
+
+      if (m_isDraggingMouse && !ImGui::GetIO().WantCaptureMouse) {
+        if (glm::distance(glm::vec2(m_mousePosX, m_mousePosY), glm::vec2(i, j)) <= m_brushRadius) {
+          new_u[cur_idx] = 0.0f;
+          new_v[cur_idx] = 1.0f;
+          continue;
+        }
+      }
 
       auto U = [&](i32 x, i32 y) { return u_conc[idx((x + w) % w, (y + h) % h)]; };
       auto V = [&](i32 x, i32 y) { return v_conc[idx((x + w) % w, (y + h) % h)]; };
