@@ -31,6 +31,8 @@ https://github.com/user-attachments/assets/db628114-ac16-4f9e-8103-303a5908ab2f
 
 ### Performance experiments
 
+All tests were ran in a 1920x1080 px viewport.
+
 **GPU:** *Full resolution (1px = 1 tile); 32 steps per frame*
 <img width="1960" height="1190" alt="image" src="https://github.com/user-attachments/assets/1bd89869-059a-4bdf-9d00-8c3d85b5172b" />
 
