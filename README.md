@@ -5,7 +5,7 @@ This project is an implementation of the **Gray–Scott reaction–diffusion** s
 ## Overview
 
 * Simulates Gray–Scott dynamics on a 2D grid and visualizes patterns in real time.
-* Parameters (feed **F**, kill **k**, diffusion **Du/Dv**, time step, steps-per-frame) are adjustable at runtime.
+* Parameters (feed **F**, kill **k**, steps-per-frame and resolution) are adjustable at runtime.
 * Interactive seeding (mouse click); lightweight on-screen profiler.
 
 ## Implementation
@@ -25,5 +25,15 @@ This project is an implementation of the **Gray–Scott reaction–diffusion** s
 
 **Technologies:** C++20, OpenGL (core), GLSL, ImGui.
 
-## Some results
+## Results
+
+https://github.com/user-attachments/assets/db628114-ac16-4f9e-8103-303a5908ab2f
+
+### Performance experiments
+
+**GPU:** *Full resolution (1px = 1 tile); 32 steps per frame*
+<img width="1960" height="1190" alt="image" src="https://github.com/user-attachments/assets/1bd89869-059a-4bdf-9d00-8c3d85b5172b" />
+
+**CPU:** *1/10 resolution (10px = 1 tile); 24 steps per frame*
+<img width="1960" height="1190" alt="image" src="https://github.com/user-attachments/assets/f18507ee-f6de-412e-9e2c-329ed7ea7d2e" />
 
